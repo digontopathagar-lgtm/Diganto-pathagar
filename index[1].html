@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="দিগন্ত পাঠাগার">
+<meta name="description" content="দিগন্ত পাঠাগার — গ্রন্থাগার ব্যবস্থাপনা সিস্টেম">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>দিগন্ত পাঠাগার</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- ══════════════════════════════════════
+     🔥 FIREBASE CONFIG — এখানে আপনার
+        Firebase config বসাবেন
+     ══════════════════════════════════════ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, push, onValue, remove, update }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCGjYDn11Mwcxu8yBNhS1GDQpEXFxOLCKM",
+    authDomain: "diganta-pathagar-d1197.firebaseapp.com",
+    databaseURL: "https://diganta-pathagar-d1197-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "diganta-pathagar-d1197",
+    storageBucket: "diganta-pathagar-d1197.firebasestorage.app",
+    messagingSenderId: "433696583621",
+    appId: "1:433696583621:web:c729092423f8ff560765ac",
+    measurementId: "G-RXE6MK7XDN"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // ── Expose to global scope ──
+  window._fb = { db, ref, set, push, onValue, remove, update };
+  window._fbReady = true;
+  window.dispatchEvent(new Event('fbReady'));
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#1a1a2e;--ink2:#16213e;--ink3:#0f3460;
+  --gold:#c9a84c;--gold2:#a07c30;--gold3:#e8c97a;
+  --cream:#f5f0e8;--cream2:#ede6d6;--cream3:#d4c9b0;
+  --text:#2d2a22;--muted:#7a7060;--lighter:#a09880;
+  --green:#2d7a52;--green-bg:#e8f5ee;
+  --red:#b03030;--red-bg:#fceaea;
+  --blue:#2a5f9e;--blue-bg:#e8f0fa;
+  --border:#d4c9b0;--border2:#c0b498;
+  --shadow:0 2px 16px rgba(0,0,0,0.08);
+  --shadow2:0 8px 40px rgba(0,0,0,0.13);
+}
+body{font-family:'Hind Siliguri',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;font-size:15px;}
+
+/* SYNC INDICATOR */
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#888;display:inline-block;margin-left:6px;transition:.3s;}
+.sync-dot.live{background:#2ecc71;box-shadow:0 0 6px #2ecc71;}
+.sync-dot.err{background:#e05050;}
+
+/* TOAST */
+.toast-wrap{position:fixed;top:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--ink2);color:var(--cream);padding:12px 20px;border-radius:10px;font-size:14px;animation:slideIn .25s ease;border-left:4px solid var(--gold);max-width:280px;}
+.toast.err{border-left-color:#e05050;}
+.toast.ok{border-left-color:var(--green);}
+@keyframes slideIn{from{transform:translateX(60px);opacity:0}to{transform:none;opacity:1}}
+
+/* LOADING */
+.fb-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--ink);gap:16px;}
+.fb-loading .spinner{width:40px;height:40px;border:3px solid rgba(201,168,76,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
+.fb-loading p{color:var(--gold3);font-size:14px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* LOGIN */
+.login-bg{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--ink);position:relative;overflow:hidden;}
+.login-bg::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 30% 40%,#c9a84c12,transparent),radial-gradient(ellipse 40% 40% at 80% 80%,#c9a84c08,transparent);}
+.login-deco{position:absolute;font-family:'Libre Baskerville',serif;color:#c9a84c08;font-size:180px;font-style:italic;user-select:none;right:-20px;bottom:-40px;line-height:1;}
+.login-card{background:var(--cream);border-radius:20px;padding:44px 40px;width:400px;max-width:92vw;position:relative;z-index:2;box-shadow:var(--shadow2);}
+.login-emblem{display:flex;align-items:center;gap:16px;margin-bottom:32px;}
+.login-icon{width:60px;height:60px;background:var(--ink2);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.login-icon svg{width:36px;height:36px;}
+.login-title{font-family:'Libre Baskerville',serif;font-size:22px;color:var(--ink);line-height:1.2;}
+.login-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.login-label{font-size:12px;color:var(--muted);margin-bottom:6px;display:block;font-weight:500;letter-spacing:.5px;}
+.login-inp{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;font-family:'Hind Siliguri',sans-serif;font-size:15px;color:var(--text);background:#fff;outline:none;transition:.2s;}
+.login-inp:focus{border-color:var(--gold2);}
+.login-btn{width:100%;border:none;border-radius:10px;padding:13px;font-family:'Hind Siliguri',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:10px;transition:.15s;}
+.btn-primary{background:var(--ink2);color:var(--cream);}
+.btn-primary:hover{background:var(--ink3);}
+.btn-outline{background:transparent;border:1.5px solid var(--border2);color:var(--muted);margin-top:8px;}
+.btn-outline:hover{border-color:var(--gold2);color:var(--gold2);}
+.login-sep{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--cream3);font-size:12px;}
+.login-sep::before,.login-sep::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* HEADER */
+.header{background:var(--ink2);border-bottom:1px solid rgba(201,168,76,.15);position:sticky;top:0;z-index:80;}
+.h-top{max-width:1120px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.h-brand{display:flex;align-items:center;gap:12px;}
+.h-logo{width:38px;height:38px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.h-logo svg{width:24px;height:24px;}
+.h-name{font-family:'Libre Baskerville',serif;font-size:17px;color:var(--gold3);letter-spacing:.3px;}
+.h-actions{display:flex;align-items:center;gap:10px;}
+.role-pill{font-size:11px;padding:5px 12px;border-radius:20px;border:1px solid rgba(201,168,76,.3);color:var(--gold3);background:rgba(201,168,76,.08);letter-spacing:.3px;display:flex;align-items:center;}
+.logout-btn{background:transparent;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;transition:.15s;}
+.logout-btn:hover{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.7);}
+.h-nav{border-top:1px solid rgba(255,255,255,.05);}
+.h-nav-inner{max-width:1120px;margin:0 auto;padding:0 24px;display:flex;gap:0;overflow-x:auto;}
+.nav-btn{background:none;border:none;cursor:pointer;font-family:'Hind Siliguri',sans-serif;font-size:14px;color:rgba(255,255,255,.45);padding:12px 18px;border-bottom:2.5px solid transparent;white-space:nowrap;transition:.15s;}
+.nav-btn:hover{color:rgba(255,255,255,.75);}
+.nav-btn.on{color:var(--gold3);border-bottom-color:var(--gold);}
+
+/* MAIN */
+.main{max-width:1120px;margin:0 auto;padding:28px 24px;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow);}
+.stat-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.si-gold{background:#fdf5e0;}.si-blue{background:var(--blue-bg);}.si-green{background:var(--green-bg);}.si-red{background:var(--red-bg);}
+.stat-val{font-size:26px;font-weight:700;color:var(--text);line-height:1;}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:3px;}
+
+/* CARDS */
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow);}
+.card-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+
+/* INPUTS */
+.inp{width:100%;border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;font-family:'Hind Siliguri',sans-serif;font-size:14px;color:var(--text);background:#fff;outline:none;transition:.2s;margin-bottom:10px;}
+.inp:focus{border-color:var(--gold2);}
+select.inp{cursor:pointer;}
+.inp-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:520px){.inp-row{grid-template-columns:1fr;}}
+
+/* BUTTONS */
+.btn{border:none;border-radius:9px;padding:10px 20px;font-family:'Hind Siliguri',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px;}
+.btn-dark{background:var(--ink2);color:var(--cream);}
+.btn-dark:hover{background:var(--ink3);}
+.btn-gold{background:var(--gold);color:#1a1a2e;}
+.btn-gold:hover{background:var(--gold2);color:#fff;}
+.btn-sm{padding:6px 14px;font-size:13px;}
+.btn-ghost{background:transparent;border:1.5px solid var(--border2);color:var(--muted);}
+.btn-ghost:hover{border-color:var(--ink2);color:var(--ink2);}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;border-bottom:1.5px solid var(--border);padding:8px 12px;text-align:left;}
+.tbl td{padding:12px;border-bottom:1px solid var(--cream2);font-size:14px;vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--cream);}
+.empty{color:var(--lighter);font-size:14px;text-align:center;padding:32px;}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.bg-green{background:var(--green-bg);color:var(--green);}
+.bg-blue{background:var(--blue-bg);color:var(--blue);}
+.bg-red{background:var(--red-bg);color:var(--red);}
+.bg-amber{background:#fdf5e0;color:#8a6200;}
+.bg-gray{background:#f0ece4;color:var(--muted);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,20,40,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px);}
+.modal-box{background:var(--cream);border-radius:18px;padding:28px;width:440px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow2);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;}
+.modal-title{font-size:17px;font-weight:700;color:var(--text);}
+.modal-close{background:transparent;border:none;cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:2px 6px;}
+.modal-close:hover{color:var(--red);}
+.modal-foot{display:flex;gap:10px;margin-top:20px;}
+.modal-foot .btn{flex:1;justify-content:center;}
+
+/* DROPDOWN */
+.drop-wrap{position:relative;margin-bottom:10px;}
+.drop-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--gold2);border-top:none;border-radius:0 0 10px 10px;max-height:170px;overflow-y:auto;z-index:50;box-shadow:0 6px 20px rgba(0,0,0,.1);}
+.drop-item{padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--cream2);}
+.drop-item:last-child{border-bottom:none;}
+.drop-item:hover{background:var(--cream);}
+
+/* SEARCH */
+.search-wrap{position:relative;}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);}
+.search-inp{padding-left:36px !important;}
+
+/* ACTIVITY */
+.activity-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--cream2);}
+.activity-item:last-child{border-bottom:none;}
+.act-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.act-text{font-size:14px;flex:1;}
+.act-time{font-size:12px;color:var(--lighter);}
+
+/* BORROW FORM */
+.borrow-section{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:640px){.borrow-section{grid-template-columns:1fr;}}
+
+/* OFFLINE BANNER */
+.offline-banner{background:#e05050;color:#fff;text-align:center;padding:8px;font-size:13px;display:none;}
+.offline-banner.show{display:block;}
+</style>
+</head>
+<body>
+<div class="offline-banner" id="offlineBanner">📡 ইন্টারনেট সংযোগ নেই — offline mode-এ আছেন</div>
+<div id="app">
+  <div class="fb-loading">
+    <div class="spinner"></div>
+    <p>Firebase সংযোগ হচ্ছে...</p>
+  </div>
+</div>
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+// ══════════════════════════════
+// CONSTANTS
+// ══════════════════════════════
+const CATS=["উপন্যাস","ছোটগল্প","কবিতা","নাটক","সায়েন্স ফিকশন","জীবনী","ইতিহাস","ধর্মীয়","প্রবন্ধ","শিশুসাহিত্য","বিজ্ঞান","অন্যান্য"];
+const LOGO_SVG=`<svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="26" width="30" height="4" rx="2" fill="#c9a84c"/><path d="M18 10 Q11 6 5 8 L5 22 Q11 20 18 24 Q25 20 31 22 L31 8 Q25 6 18 10Z" stroke="#c9a84c" stroke-width="1.4" fill="rgba(201,168,76,0.08)"/><line x1="18" y1="10" x2="18" y2="24" stroke="#c9a84c" stroke-width="1"/><circle cx="18" cy="8" r="2" fill="#c9a84c" opacity=".5"/></svg>`;
+
+// ══════════════════════════════
+// STATE
+// ══════════════════════════════
+let S={
+  screen:'loading', role:null, tab:0,
+  books:{}, members:{}, borrows:{}, passes:{},
+  modal:null, form:{},
+  borrow:{bookId:'',bookTitle:'',memberId:'',memberName:'',bookQuery:'',memberQuery:''},
+  search:'', searchCat:'',
+  ui:{dropBook:false,dropMember:false},
+  passInput:'', syncLive:false
+};
+
+// ══════════════════════════════
+// FIREBASE HELPERS
+// ══════════════════════════════
+function fb(){return window._fb;}
+
+function fbSet(path,val){
+  const {db,ref,set}=fb();
+  return set(ref(db,path),val);
+}
+function fbPush(path,val){
+  const {db,ref,push}=fb();
+  return push(ref(db,path),val);
+}
+function fbRemove(path){
+  const {db,ref,remove}=fb();
+  return remove(ref(db,path));
+}
+function fbUpdate(path,val){
+  const {db,ref,update}=fb();
+  return update(ref(db,path),val);
+}
+function fbListen(path,cb){
+  const {db,ref,onValue}=fb();
+  return onValue(ref(db,path),snap=>{
+    cb(snap.exists()?snap.val():null);
+  });
+}
+
+// ══════════════════════════════
+// INIT — Listen to all data
+// ══════════════════════════════
+function initListeners(){
+  fbListen('books',v=>{S.books=v||{};if(S.screen==='app')render();});
+  fbListen('members',v=>{S.members=v||{};if(S.screen==='app')render();});
+  fbListen('borrows',v=>{S.borrows=v||{};if(S.screen==='app')render();});
+  fbListen('passes',v=>{
+    if(v){
+      // passes stored as {key: "pw1", key2:"pw2"} or array-like
+      S.passes=typeof v==='object'?Object.values(v):v;
+    } else {
+      // first time — set default
+      fbSet('passes',{p0:'diganta2025'});
+      S.passes=['diganta2025'];
+    }
+    if(S.screen==='loading'){S.screen='login';render();}
+    else if(S.screen==='app') render();
+  });
+  S.syncLive=true;
+}
+
+// ══════════════════════════════
+// TOAST
+// ══════════════════════════════
+function toast(msg,type='ok'){
+  const w=document.getElementById('toasts');
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;el.textContent=msg;
+  w.appendChild(el);setTimeout(()=>el.remove(),3500);
+}
+
+// ══════════════════════════════
+// AUTH
+// ══════════════════════════════
+function tryLogin(){
+  const pw=S.passInput.trim();
+  if(!pw){toast('পাসওয়ার্ড দিন','err');return;}
+  if(S.passes.includes(pw)){
+    S.role='admin';S.screen='app';S.passInput='';S.tab=0;render();
+  } else {
+    toast('ভুল পাসওয়ার্ড!','err');
+  }
+}
+function enterViewer(){S.role='viewer';S.screen='app';S.tab=0;render();}
+function logout(){S.screen='login';S.role=null;S.tab=0;render();}
+
+// ══════════════════════════════
+// BOOKS
+// ══════════════════════════════
+function saveBook(){
+  const {title,author,cat,total,isbn,shelf}=S.form;
+  if(!title||!cat)return toast('বইয়ের নাম ও বিভাগ আবশ্যক','err');
+  const tot=parseInt(total)||1;
+  fbPush('books',{title,author:author||'অজানা লেখক',cat,total:tot,avail:tot,isbn:isbn||'',shelf:shelf||'',addedAt:nowDate()})
+    .then(()=>{S.modal=null;S.form={};toast('বই যোগ হয়েছে');render();});
+}
+
+function deleteBook(id){
+  const bk=S.books[id];
+  const onLoan=Object.values(S.borrows).filter(b=>b.bookId===id&&!b.ret).length;
+  if(onLoan>0)return toast('বইটি ধারে আছে, মুছতে পারবেন না','err');
+  if(!confirm(`"${bk.title}" বইটি মুছে দেবেন?`))return;
+  fbRemove('books/'+id).then(()=>toast('বই মুছে গেছে'));
+}
+
+// ══════════════════════════════
+// MEMBERS
+// ══════════════════════════════
+function saveMember(){
+  const {name,phone,address}=S.form;
+  if(!name||!phone)return toast('নাম ও ফোন আবশ্যক','err');
+  const exists=Object.values(S.members).find(m=>m.phone===phone);
+  if(exists)return toast('এই ফোন নম্বর আগেই আছে','err');
+  fbPush('members',{name,phone,address:address||'',joinedAt:nowDate(),active:true})
+    .then(()=>{S.modal=null;S.form={};toast('সদস্য যোগ হয়েছে');render();});
+}
+
+function deleteMember(id){
+  const hasBorrow=Object.values(S.borrows).filter(b=>b.memberId===id&&!b.ret).length;
+  if(hasBorrow>0)return toast('সদস্যের ধার পেন্ডিং আছে','err');
+  if(!confirm('সদস্যকে মুছে দেবেন?'))return;
+  fbRemove('members/'+id).then(()=>toast('সদস্য মুছে গেছে'));
+}
+
+// ══════════════════════════════
+// BORROW
+// ══════════════════════════════
+function issueBorrow(){
+  if(!S.borrow.bookId)return toast('বই সিলেক্ট করুন','err');
+  if(!S.borrow.memberId)return toast('সদস্য সিলেক্ট করুন','err');
+  const bk=S.books[S.borrow.bookId];
+  if(!bk||bk.avail<1)return toast('বইটি এই মুহূর্তে পাওয়া যাচ্ছে না','err');
+  const dueDays=parseInt(document.getElementById('dueDays')?.value)||14;
+  const record={
+    bookId:S.borrow.bookId, bookTitle:S.borrow.bookTitle,
+    memberId:S.borrow.memberId, memberName:S.borrow.memberName,
+    issuedAt:nowDate(), dueDate:futureDate(dueDays), ret:false, returnedAt:null
+  };
+  fbPush('borrows',record).then(()=>{
+    fbUpdate('books/'+S.borrow.bookId,{avail:bk.avail-1}).then(()=>{
+      S.borrow={bookId:'',bookTitle:'',memberId:'',memberName:'',bookQuery:'',memberQuery:''};
+      toast('বই ধার দেওয়া হয়েছে');render();
+    });
+  });
+}
+
+function returnBorrow(id){
+  const rec=S.borrows[id];
+  if(!rec)return;
+  const bk=S.books[rec.bookId];
+  fbUpdate('borrows/'+id,{ret:true,returnedAt:nowDate()}).then(()=>{
+    if(bk) fbUpdate('books/'+rec.bookId,{avail:(bk.avail||0)+1});
+    toast(`"${rec.bookTitle}" ফেরত নেওয়া হয়েছে`);
+  });
+}
+
+// ══════════════════════════════
+// PASSWORD
+// ══════════════════════════════
+function addPass(){
+  const pw=(S.form.newPass||'').trim();
+  if(pw.length<6)return toast('পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে','err');
+  if(S.passes.includes(pw))return toast('এই পাসওয়ার্ড আগেই আছে','err');
+  fbPush('passes',pw).then(()=>{S.form.newPass='';toast('নতুন পাসওয়ার্ড যোগ হয়েছে');render();});
+}
+
+function removePass(pw){
+  if(S.passes.length<=1)return toast('অন্তত একটি পাসওয়ার্ড রাখতে হবে','err');
+  // find key of this pass in firebase
+  const {db,ref,onValue,remove:fbRem}=fb();
+  onValue(ref(db,'passes'),snap=>{
+    if(!snap.exists())return;
+    const data=snap.val();
+    let keyToRemove=null;
+    for(const[k,v] of Object.entries(data)){if(v===pw){keyToRemove=k;break;}}
+    if(keyToRemove) fbRem(ref(db,'passes/'+keyToRemove)).then(()=>toast('পাসওয়ার্ড মুছে গেছে'));
+  },{onlyOnce:true});
+}
+
+// ══════════════════════════════
+// HELPERS
+// ══════════════════════════════
+function nowDate(){return new Date().toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'});}
+function futureDate(days){const d=new Date();d.setDate(d.getDate()+days);return d.toLocaleDateString('bn-BD',{day:'numeric',month:'long',year:'numeric'});}
+function memberBorrowCount(mId){return Object.values(S.borrows).filter(b=>b.memberId===mId&&!b.ret).length;}
+function booksArr(){return Object.entries(S.books).map(([id,v])=>({id,...v}));}
+function membersArr(){return Object.entries(S.members).map(([id,v])=>({id,...v}));}
+function borrowsArr(){return Object.entries(S.borrows).map(([id,v])=>({id,...v}));}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// ══════════════════════════════
+// RENDER
+// ══════════════════════════════
+function render(){
+  document.getElementById('app').innerHTML=
+    S.screen==='loading'?renderLoading():
+    S.screen==='login'?renderLogin():
+    renderApp();
+  attachEvents();
+}
+
+function attachEvents(){
+  document.querySelectorAll('[data-action]').forEach(el=>{
+    const a=el.dataset.action;
+    if(a==='tryLogin')el.onclick=tryLogin;
+    if(a==='enterViewer')el.onclick=enterViewer;
+    if(a==='logout')el.onclick=logout;
+    if(a==='saveBook')el.onclick=saveBook;
+    if(a==='saveMember')el.onclick=saveMember;
+    if(a==='issueBorrow')el.onclick=issueBorrow;
+    if(a==='addPass')el.onclick=addPass;
+    if(a==='closeModal'){el.onclick=()=>{S.modal=null;S.form={};render();}}
+    if(a==='openBook'){el.onclick=()=>{S.modal='book';S.form={};render();}}
+    if(a==='openMember'){el.onclick=()=>{S.modal='member';S.form={};render();}}
+    if(a.startsWith('tab:')){el.onclick=()=>{S.tab=parseInt(a.split(':')[1]);render();}}
+    if(a.startsWith('return:')){el.onclick=()=>returnBorrow(a.split(':')[1]);}
+    if(a.startsWith('delBook:')){el.onclick=()=>deleteBook(a.split(':')[1]);}
+    if(a.startsWith('delMember:')){el.onclick=()=>deleteMember(a.split(':')[1]);}
+    if(a.startsWith('delPass:')){el.onclick=()=>removePass(decodeURIComponent(a.split(':')[1]));}
+  });
+  const bind=(sel,fn)=>{const el=document.querySelector(sel);if(el)el.oninput=fn;}
+  bind('#loginPwField',e=>{S.passInput=e.target.value;});
+  bind('#fTitle',e=>{S.form.title=e.target.value;});
+  bind('#fAuthor',e=>{S.form.author=e.target.value;});
+  bind('#fCat',e=>{S.form.cat=e.target.value;});
+  bind('#fTotal',e=>{S.form.total=e.target.value;});
+  bind('#fIsbn',e=>{S.form.isbn=e.target.value;});
+  bind('#fShelf',e=>{S.form.shelf=e.target.value;});
+  bind('#fName',e=>{S.form.name=e.target.value;});
+  bind('#fPhone',e=>{S.form.phone=e.target.value;});
+  bind('#fAddress',e=>{S.form.address=e.target.value;});
+  bind('#fNewPass',e=>{S.form.newPass=e.target.value;});
+  bind('#globalSearch',e=>{S.search=e.target.value;render();});
+  bind('#searchCat',e=>{S.searchCat=e.target.value;render();});
+  bind('#bkQuery',e=>{S.borrow.bookQuery=e.target.value;S.ui.dropBook=true;if(!e.target.value){S.borrow.bookId='';S.borrow.bookTitle='';}render();});
+  bind('#mbQuery',e=>{S.borrow.memberQuery=e.target.value;S.ui.dropMember=true;if(!e.target.value){S.borrow.memberId='';S.borrow.memberName='';}render();});
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('#bkDropWrap')&&S.ui.dropBook){S.ui.dropBook=false;render();}
+    if(!e.target.closest('#mbDropWrap')&&S.ui.dropMember){S.ui.dropMember=false;render();}
+  },{once:true});
+  const lf=document.getElementById('loginPwField');
+  if(lf)lf.onkeydown=e=>{if(e.key==='Enter')tryLogin();};
+}
+
+// ── Renders ──
+function renderLoading(){
+  return`<div class="fb-loading"><div class="spinner"></div><p>Firebase সংযোগ হচ্ছে...</p></div>`;
+}
+
+function renderLogin(){
+  return`<div class="login-bg">
+    <div class="login-deco">পাঠাগার</div>
+    <div class="login-card">
+      <div class="login-emblem">
+        <div class="login-icon">${LOGO_SVG}</div>
+        <div><div class="login-title">দিগন্ত পাঠাগার</div><div class="login-sub">গ্রন্থাগার ব্যবস্থাপনা সিস্টেম</div></div>
+      </div>
+      <label class="login-label">অ্যাডমিন পাসওয়ার্ড</label>
+      <input id="loginPwField" class="login-inp" type="password" placeholder="পাসওয়ার্ড লিখুন...">
+      <button class="login-btn btn-primary" data-action="tryLogin">লগইন করুন</button>
+      <div class="login-sep">অথবা</div>
+      <button class="login-btn btn-outline" data-action="enterViewer">👁 শুধু দেখুন (Viewer Mode)</button>
+    </div>
+  </div>`;
+}
+
+function renderApp(){
+  const tabs=['ড্যাশবোর্ড','বইয়ের তালিকা','সদস্যবৃন্দ','বই ধার','অনুসন্ধান'];
+  if(S.role==='admin')tabs.push('সেটিংস');
+  return`
+    <div class="header">
+      <div class="h-top">
+        <div class="h-brand">
+          <div class="h-logo">${LOGO_SVG}</div>
+          <div class="h-name">দিগন্ত পাঠাগার</div>
+        </div>
+        <div class="h-actions">
+          <span class="role-pill">${S.role==='admin'?'⚙ অ্যাডমিন':'👁 দর্শক'}<span class="sync-dot ${S.syncLive?'live':'err'}" title="${S.syncLive?'সংযুক্ত':'সংযোগ নেই'}"></span></span>
+          <button class="logout-btn" data-action="logout">লগআউট</button>
+        </div>
+      </div>
+      <div class="h-nav"><div class="h-nav-inner">
+        ${tabs.map((t,i)=>`<button class="nav-btn ${S.tab===i?'on':''}" data-action="tab:${i}">${t}</button>`).join('')}
+      </div></div>
+    </div>
+    <div class="main">${renderTab()}</div>
+    ${S.modal?renderModal():''}
+  `;
+}
+
+function renderTab(){
+  if(S.tab===0)return renderDash();
+  if(S.tab===1)return renderBooks();
+  if(S.tab===2)return renderMembers();
+  if(S.tab===3)return renderBorrow();
+  if(S.tab===4)return renderSearch();
+  if(S.tab===5&&S.role==='admin')return renderSettings();
+  return'';
+}
+
+function renderDash(){
+  const books=booksArr();const members=membersArr();const borrows=borrowsArr();
+  const pending=borrows.filter(b=>!b.ret).length;
+  const totalAvail=books.reduce((a,b)=>a+b.avail,0);
+  const recent=borrows.slice(-6).reverse();
+  return`
+    <div class="stats">
+      <div class="stat-card"><div class="stat-icon si-gold">📚</div><div><div class="stat-val">${books.length}</div><div class="stat-lbl">মোট বই</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-blue">👤</div><div><div class="stat-val">${members.length}</div><div class="stat-lbl">সদস্য</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-red">⏳</div><div><div class="stat-val">${pending}</div><div class="stat-lbl">ধারে আছে</div></div></div>
+      <div class="stat-card"><div class="stat-icon si-green">✅</div><div><div class="stat-val">${totalAvail}</div><div class="stat-lbl">লাইব্রেরিতে আছে</div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">সাম্প্রতিক কার্যক্রম <span style="font-size:12px;color:var(--muted);font-weight:400">🔴 Live</span></div>
+      ${recent.length?recent.map(b=>`
+        <div class="activity-item">
+          <div class="act-dot" style="background:${b.ret?'var(--green)':'var(--blue)'}"></div>
+          <div class="act-text"><b>${esc(b.bookTitle)}</b> — ${esc(b.memberName)}</div>
+          <span class="badge ${b.ret?'bg-green':'bg-blue'}">${b.ret?'ফেরত':'ধারে'}</span>
+        </div>`).join(''):`<div class="empty">এখনো কোনো কার্যক্রম নেই</div>`}
+    </div>`;
+}
+
+function renderBooks(){
+  const q=S.search.toLowerCase().trim();
+  const list=booksArr().filter(b=>!q||(b.title+b.author+b.cat).toLowerCase().includes(q));
+  return`
+    <div class="section-head">
+      <div class="search-wrap" style="flex:1;max-width:400px">
+        <span class="search-icon">🔍</span>
+        <input id="globalSearch" class="inp search-inp" placeholder="বই, লেখক বা বিভাগ খুঁজুন..." value="${esc(S.search)}" style="margin-bottom:0">
+      </div>
+      ${S.role==='admin'?`<button class="btn btn-dark" data-action="openBook">+ নতুন বই</button>`:''}
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th>বইয়ের নাম ও লেখক</th><th>বিভাগ</th><th>মোট কপি</th><th>পাওয়া যাচ্ছে</th>${S.role==='admin'?'<th></th>':''}</tr></thead>
+        <tbody>
+          ${list.length?list.map(b=>`<tr>
+            <td><div style="font-weight:600">${esc(b.title)}</div><div style="font-size:12px;color:var(--muted)">${esc(b.author)}${b.shelf?` · তাক: ${esc(b.shelf)}`:''}</div></td>
+            <td><span class="badge bg-gray">${esc(b.cat)}</span></td>
+            <td>${b.total}</td>
+            <td><span class="badge ${b.avail>0?'bg-green':'bg-red'}">${b.avail}</span></td>
+            ${S.role==='admin'?`<td><button class="btn btn-ghost btn-sm" data-action="delBook:${b.id}">মুছুন</button></td>`:''}
+          </tr>`).join(''):`<tr><td colspan="5" class="empty">কোনো বই পাওয়া যায়নি</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderMembers(){
+  const q=S.search.toLowerCase().trim();
+  const list=membersArr().filter(m=>!q||(m.name+m.phone).toLowerCase().includes(q));
+  return`
+    <div class="section-head">
+      <div class="search-wrap" style="flex:1;max-width:400px">
+        <span class="search-icon">🔍</span>
+        <input id="globalSearch" class="inp search-inp" placeholder="নাম বা ফোন দিয়ে খুঁজুন..." value="${esc(S.search)}" style="margin-bottom:0">
+      </div>
+      ${S.role==='admin'?`<button class="btn btn-dark" data-action="openMember">+ নতুন সদস্য</button>`:''}
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="tbl">
+        <thead><tr><th>নাম</th><th>ফোন</th><th>যোগ দেওয়ার তারিখ</th><th>ধারে আছে</th>${S.role==='admin'?'<th></th>':''}</tr></thead>
+        <tbody>
+          ${list.length?list.map(m=>{const cnt=memberBorrowCount(m.id);return`<tr>
+            <td><div style="font-weight:600">${esc(m.name)}</div>${m.address?`<div style="font-size:12px;color:var(--muted)">${esc(m.address)}</div>`:''}</td>
+            <td>${esc(m.phone)}</td>
+            <td style="font-size:13px;color:var(--muted)">${esc(m.joinedAt)}</td>
+            <td><span class="badge ${cnt>0?'bg-amber':'bg-green'}">${cnt} টি বই</span></td>
+            ${S.role==='admin'?`<td><button class="btn btn-ghost btn-sm" data-action="delMember:${m.id}">মুছুন</button></td>`:''}
+          </tr>`;}).join(''):`<tr><td colspan="5" class="empty">কোনো সদস্য নেই</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderBorrow(){
+  const pending=borrowsArr().filter(b=>!b.ret);
+  const done=borrowsArr().filter(b=>b.ret).slice(-20).reverse();
+  const bkQ=S.borrow.bookQuery.toLowerCase();
+  const bkList=booksArr().filter(b=>b.avail>0&&(!bkQ||b.title.toLowerCase().includes(bkQ)||b.author.toLowerCase().includes(bkQ)));
+  const mbQ=S.borrow.memberQuery.toLowerCase();
+  const mbList=membersArr().filter(m=>!mbQ||m.name.toLowerCase().includes(mbQ)||m.phone.includes(mbQ));
+
+  let issueHtml='';
+  if(S.role==='admin'){
+    issueHtml=`<div class="card">
+      <div class="card-title">বই ধার দিন</div>
+      <div class="borrow-section">
+        <div>
+          <label style="font-size:12px;color:var(--muted);margin-bottom:5px;display:block">বই নির্বাচন</label>
+          <div class="drop-wrap" id="bkDropWrap">
+            <input id="bkQuery" class="inp" placeholder="বইয়ের নাম বা লেখক লিখুন..." value="${esc(S.borrow.bookQuery)}" style="margin-bottom:0;border-radius:${S.ui.dropBook&&bkList.length?'9px 9px 0 0':'9px'}">
+            ${S.ui.dropBook&&bkList.length?`<div class="drop-list">${bkList.map(b=>`<div class="drop-item" onclick="selectBook('${b.id}','${esc(b.title)}')">${esc(b.title)} <span style='color:var(--muted);font-size:12px'>(${b.avail} কপি)</span></div>`).join('')}</div>`:''}
+            ${S.borrow.bookTitle?`<div style="margin-top:6px"><span class="badge bg-green">✓ ${esc(S.borrow.bookTitle)}</span></div>`:''}
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--muted);margin-bottom:5px;display:block">সদস্য নির্বাচন</label>
+          <div class="drop-wrap" id="mbDropWrap">
+            <input id="mbQuery" class="inp" placeholder="সদস্যের নাম বা ফোন লিখুন..." value="${esc(S.borrow.memberQuery)}" style="margin-bottom:0;border-radius:${S.ui.dropMember&&mbList.length?'9px 9px 0 0':'9px'}">
+            ${S.ui.dropMember&&mbList.length?`<div class="drop-list">${mbList.map(m=>`<div class="drop-item" onclick="selectMember('${m.id}','${esc(m.name)}')">${esc(m.name)} <span style='color:var(--muted);font-size:12px'>(${m.phone})</span></div>`).join('')}</div>`:''}
+            ${S.borrow.memberName?`<div style="margin-top:6px"><span class="badge bg-blue">✓ ${esc(S.borrow.memberName)}</span></div>`:''}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <label style="font-size:13px;color:var(--muted)">ফেরতের মেয়াদ:</label>
+        <select id="dueDays" class="inp" style="width:auto;margin-bottom:0">
+          <option value="7">৭ দিন</option><option value="14" selected>১৪ দিন</option>
+          <option value="21">২১ দিন</option><option value="30">৩০ দিন</option>
+        </select>
+      </div>
+      <button class="btn btn-dark" style="width:100%;margin-top:14px;justify-content:center" data-action="issueBorrow">ধার নিশ্চিত করুন →</button>
+    </div>`;
+  }
+
+  return issueHtml+`
+    <div class="card">
+      <div class="card-title">পেন্ডিং ধার <span class="badge bg-red" style="font-size:13px">${pending.length}</span></div>
+      <table class="tbl">
+        <thead><tr><th>বই</th><th>সদস্য</th><th>ইস্যু তারিখ</th><th>ফেরতের তারিখ</th>${S.role==='admin'?'<th></th>':''}</tr></thead>
+        <tbody>
+          ${pending.length?pending.map(b=>`<tr>
+            <td style="font-weight:600">${esc(b.bookTitle)}</td><td>${esc(b.memberName)}</td>
+            <td style="font-size:13px;color:var(--muted)">${esc(b.issuedAt)}</td>
+            <td style="font-size:13px;color:var(--muted)">${esc(b.dueDate||'—')}</td>
+            ${S.role==='admin'?`<td><button class="btn btn-gold btn-sm" data-action="return:${b.id}">ফেরত নিন</button></td>`:''}
+          </tr>`).join(''):`<tr><td colspan="5" class="empty">কোনো পেন্ডিং নেই</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">ফেরত দেওয়া হয়েছে (সাম্প্রতিক)</div>
+      <table class="tbl">
+        <thead><tr><th>বই</th><th>সদস্য</th><th>ইস্যু</th><th>ফেরত</th></tr></thead>
+        <tbody>
+          ${done.length?done.map(b=>`<tr>
+            <td>${esc(b.bookTitle)}</td><td>${esc(b.memberName)}</td>
+            <td style="font-size:13px;color:var(--muted)">${esc(b.issuedAt)}</td>
+            <td style="font-size:13px;color:var(--muted)">${esc(b.returnedAt||'—')}</td>
+          </tr>`).join(''):`<tr><td colspan="4" class="empty">কোনো ফেরত রেকর্ড নেই</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderSearch(){
+  const q=S.search.toLowerCase().trim();
+  const cat=S.searchCat;
+  const books=booksArr().filter(b=>(!q||(b.title+b.author).toLowerCase().includes(q))&&(!cat||b.cat===cat));
+  return`
+    <div class="card">
+      <div class="card-title">বই অনুসন্ধান</div>
+      <div class="inp-row">
+        <div class="search-wrap"><span class="search-icon">🔍</span><input id="globalSearch" class="inp search-inp" placeholder="নাম বা লেখক..." value="${esc(S.search)}" style="margin-bottom:0"></div>
+        <select id="searchCat" class="inp" style="margin-bottom:0">
+          <option value="">সব বিভাগ</option>
+          ${CATS.map(c=>`<option value="${c}" ${S.searchCat===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    ${q||cat?`<div class="card" style="padding:0;overflow:hidden"><table class="tbl">
+      <thead><tr><th>বই</th><th>লেখক</th><th>বিভাগ</th><th>কপি পাওয়া যাচ্ছে</th></tr></thead>
+      <tbody>${books.length?books.map(b=>`<tr>
+        <td style="font-weight:600">${esc(b.title)}</td><td>${esc(b.author)}</td>
+        <td><span class="badge bg-gray">${esc(b.cat)}</span></td>
+        <td><span class="badge ${b.avail>0?'bg-green':'bg-red'}">${b.avail>0?b.avail+' কপি':'অনুপলব্ধ'}</span></td>
+      </tr>`).join(''):`<tr><td colspan="4" class="empty">কোনো বই পাওয়া যায়নি</td></tr>`}</tbody>
+    </table></div>`:'<div class="card"><div class="empty">উপরে লিখুন বা বিভাগ বেছে নিন...</div></div>'}`;
+}
+
+function renderSettings(){
+  const books=booksArr();const members=membersArr();const borrows=borrowsArr();
+  return`
+    <div class="card">
+      <div class="card-title">পাসওয়ার্ড ব্যবস্থাপনা</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">একাধিক অ্যাডমিন থাকলে আলাদা পাসওয়ার্ড যোগ করতে পারবেন।</p>
+      <table class="tbl">
+        <thead><tr><th>#</th><th>পাসওয়ার্ড</th><th></th></tr></thead>
+        <tbody>${S.passes.map((p,i)=>`<tr>
+          <td style="color:var(--muted)">${i+1}</td>
+          <td><span style="font-family:monospace;letter-spacing:1px">${'•'.repeat(Math.min(p.length,12))}</span></td>
+          <td><button class="btn btn-ghost btn-sm" data-action="delPass:${encodeURIComponent(p)}">মুছুন</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <input id="fNewPass" class="inp" style="margin-bottom:0;flex:1" type="password" placeholder="নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" value="${esc(S.form.newPass||'')}">
+        <button class="btn btn-dark" data-action="addPass">যোগ করুন</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">লাইব্রেরি পরিসংখ্যান</div>
+      <table class="tbl"><tbody>
+        <tr><td>মোট বই (আলাদা টাইটেল)</td><td style="font-weight:700">${books.length}</td></tr>
+        <tr><td>মোট কপি</td><td style="font-weight:700">${books.reduce((a,b)=>a+b.total,0)}</td></tr>
+        <tr><td>মোট সদস্য</td><td style="font-weight:700">${members.length}</td></tr>
+        <tr><td>সর্বমোট ধার দেওয়া হয়েছে</td><td style="font-weight:700">${borrows.length} বার</td></tr>
+        <tr><td>এখন ধারে আছে</td><td style="font-weight:700">${borrows.filter(b=>!b.ret).length}</td></tr>
+      </tbody></table>
+    </div>`;
+}
+
+function renderModal(){
+  let content='';
+  if(S.modal==='book'){
+    content=`
+      <div class="modal-head"><span class="modal-title">নতুন বই যোগ করুন</span><button class="modal-close" data-action="closeModal">✕</button></div>
+      <input id="fTitle" class="inp" placeholder="বইয়ের নাম *" value="${esc(S.form.title||'')}">
+      <input id="fAuthor" class="inp" placeholder="লেখকের নাম" value="${esc(S.form.author||'')}">
+      <select id="fCat" class="inp"><option value="">বিভাগ বেছে নিন *</option>${CATS.map(c=>`<option value="${c}" ${S.form.cat===c?'selected':''}>${c}</option>`).join('')}</select>
+      <div class="inp-row">
+        <input id="fTotal" class="inp" type="number" min="1" placeholder="কপি সংখ্যা" value="${esc(S.form.total||'')}">
+        <input id="fShelf" class="inp" placeholder="তাক/র‍্যাক নং" value="${esc(S.form.shelf||'')}">
+      </div>
+      <input id="fIsbn" class="inp" placeholder="ISBN (ঐচ্ছিক)" value="${esc(S.form.isbn||'')}">
+      <div class="modal-foot">
+        <button class="btn btn-dark" data-action="saveBook">সংরক্ষণ করুন</button>
+        <button class="btn btn-ghost" data-action="closeModal">বাতিল</button>
+      </div>`;
+  } else if(S.modal==='member'){
+    content=`
+      <div class="modal-head"><span class="modal-title">নতুন সদস্য যোগ করুন</span><button class="modal-close" data-action="closeModal">✕</button></div>
+      <input id="fName" class="inp" placeholder="সদস্যের নাম *" value="${esc(S.form.name||'')}">
+      <input id="fPhone" class="inp" placeholder="ফোন নম্বর *" value="${esc(S.form.phone||'')}">
+      <input id="fAddress" class="inp" placeholder="ঠিকানা (ঐচ্ছিক)" value="${esc(S.form.address||'')}">
+      <div class="modal-foot">
+        <button class="btn btn-dark" data-action="saveMember">সংরক্ষণ করুন</button>
+        <button class="btn btn-ghost" data-action="closeModal">বাতিল</button>
+      </div>`;
+  }
+  return`<div class="modal-overlay" onclick="if(event.target===this){S.modal=null;S.form={};render();}"><div class="modal-box">${content}</div></div>`;
+}
+
+window.selectBook=function(id,title){S.borrow.bookId=id;S.borrow.bookTitle=title;S.borrow.bookQuery=title;S.ui.dropBook=false;render();};
+window.selectMember=function(id,name){S.borrow.memberId=id;S.borrow.memberName=name;S.borrow.memberQuery=name;S.ui.dropMember=false;render();};
+
+// ── Offline detection ──
+window.addEventListener('online',()=>{document.getElementById('offlineBanner').classList.remove('show');});
+window.addEventListener('offline',()=>{document.getElementById('offlineBanner').classList.add('show');});
+
+// ── Wait for Firebase ──
+if(window._fbReady){initListeners();}
+else{window.addEventListener('fbReady',initListeners);}
+</script>
+
+<!-- SERVICE WORKER REGISTRATION -->
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW failed:',e));
+  });
+}
+</script>
+</body>
+</html>
