@@ -222,7 +222,8 @@ let S={
   ui:{dropBook:false,dropMember:false},
   showAdminLogin:false, adminPwInput:'',
   syncLive:false,
-  logoTapCount:0, logoTapTimer:null
+  logoTapCount:0, logoTapTimer:null,
+  complaints:{}, complaintText:''
 };
 
 // ══════════════════════════════
@@ -239,6 +240,7 @@ function initListeners(){
   fbListen('books',v=>{S.books=v||{};if(S.screen==='app')render();});
   fbListen('members',v=>{S.members=v||{};if(S.screen==='app')render();});
   fbListen('borrows',v=>{S.borrows=v||{};if(S.screen==='app')render();});
+  fbListen('complaints',v=>{S.complaints=v||{};if(S.screen==='app')render();});
   fbListen('passes',v=>{
     if(v){S.passes=typeof v==='object'?Object.values(v):v;}
     else{fbSet('passes',{p0:'diganta2025'});S.passes=['diganta2025'];}
@@ -308,6 +310,16 @@ function saveBook(){
   const{title,author,cat,total,isbn,shelf,editId}=S.form;
   if(!title||!cat)return toast('বইয়ের নাম ও বিভাগ আবশ্যক','err');
   const tot=parseInt(total)||1;
+  // Duplicate check
+  if(!editId){
+    const dup=Object.values(S.books).find(b=>
+      b.title.trim().toLowerCase()===title.trim().toLowerCase()&&
+      (b.author||'').trim().toLowerCase()===(author||'').trim().toLowerCase()
+    );
+    if(dup){
+      if(!confirm(`"${title}" (${author||'অজানা লেখক'}) নামে বই আগেই আছে!\nআবারও যোগ করবেন?`))return;
+    }
+  }
   if(editId){
     const old=S.books[editId];
     const diff=tot-(old.total||1);
@@ -405,6 +417,27 @@ function removePass(pw){
   },{onlyOnce:true});
 }
 
+
+// ══════════════════════════════
+// COMPLAINTS
+// ══════════════════════════════
+function submitComplaint(){
+  const txt=(S.complaintText||'').trim();
+  if(!txt)return toast('অভিযোগ লিখুন','err');
+  if(txt.length<5)return toast('একটু বিস্তারিত লিখুন','err');
+  fbPush('complaints',{text:txt,sentAt:nowDate(),read:false})
+    .then(()=>{S.complaintText='';toast('অভিযোগ পাঠানো হয়েছে ✓');render();});
+}
+
+function markComplaintRead(id){
+  fbUpdate('complaints/'+id,{read:true});
+}
+
+function deleteComplaint(id){
+  if(!confirm('অভিযোগটি মুছে দেবেন?'))return;
+  fbRemove('complaints/'+id).then(()=>toast('মুছে গেছে'));
+}
+
 // ══════════════════════════════
 // HELPERS
 // ══════════════════════════════
@@ -451,6 +484,9 @@ function attachEvents(){
     if(a.startsWith('delMember:')){el.onclick=()=>deleteMember(a.split(':')[1]);}
     if(a.startsWith('editMember:')){el.onclick=()=>editMember(a.split(':')[1]);}
     if(a.startsWith('delPass:')){el.onclick=()=>removePass(decodeURIComponent(a.split(':')[1]));}
+    if(a==='submitComplaint')el.onclick=submitComplaint;
+    if(a.startsWith('markRead:')){el.onclick=()=>markComplaintRead(a.split(':')[1]);}
+    if(a.startsWith('delComplaint:')){el.onclick=()=>deleteComplaint(a.split(':')[1]);}
   });
 
   const bind=(sel,fn)=>{const el=document.querySelector(sel);if(el)el.oninput=fn;}
@@ -465,7 +501,13 @@ function attachEvents(){
   bind('#fPhone',e=>{S.form.phone=e.target.value;});
   bind('#fAddress',e=>{S.form.address=e.target.value;});
   bind('#fNewPass',e=>{S.form.newPass=e.target.value;});
-  bind('#globalSearch',e=>{S.search=e.target.value;render();});
+  const gsEl=document.getElementById('globalSearch');
+  if(gsEl){
+    gsEl.oninput=e=>{S.search=e.target.value;};
+    gsEl.onkeyup=e=>{if(e.key==='Enter'||e.key==='Search'){render();}};
+    gsEl.onblur=e=>{S.search=e.target.value;render();};
+  }
+  bind('#complaintInput',e=>{S.complaintText=e.target.value;});
   bind('#searchCat',e=>{S.searchCat=e.target.value;render();});
   bind('#bkQuery',e=>{S.borrow.bookQuery=e.target.value;S.ui.dropBook=true;if(!e.target.value){S.borrow.bookId='';S.borrow.bookTitle='';}render();});
   bind('#mbQuery',e=>{S.borrow.memberQuery=e.target.value;S.ui.dropMember=true;if(!e.target.value){S.borrow.memberId='';S.borrow.memberName='';}render();});
@@ -482,7 +524,7 @@ function attachEvents(){
 // ── APP SHELL ──
 function renderApp(){
   const isAdmin=S.role==='admin';
-  const tabs=['ড্যাশবোর্ড','বইয়ের তালিকা','সদস্যবৃন্দ','অনুসন্ধান'];
+  const tabs=['ড্যাশবোর্ড','বইয়ের তালিকা','সদস্যবৃন্দ','অনুসন্ধান','অভিযোগ'];
   if(isAdmin){tabs.splice(3,0,'বই ধার');tabs.push('সেটিংস');}
 
   return`
@@ -517,7 +559,8 @@ function renderTab(){
   if(S.tab===2)return renderMembers();
   if(isAdmin&&S.tab===3)return renderBorrow();
   if(S.tab===(isAdmin?4:3))return renderSearch();
-  if(isAdmin&&S.tab===5)return renderSettings();
+  if(S.tab===(isAdmin?5:4))return renderComplaints();
+  if(isAdmin&&S.tab===6)return renderSettings();
   return'';
 }
 
@@ -751,6 +794,42 @@ function renderSettings(){
         <tr><td>এখন ধারে আছে</td><td style="font-weight:700">${borrows.filter(b=>!b.ret).length}</td></tr>
       </tbody></table>
     </div>`;
+}
+
+
+// ── COMPLAINTS ──
+function renderComplaints(){
+  const isAdmin=S.role==='admin';
+  const list=Object.entries(S.complaints).map(([id,v])=>({id,...v})).reverse();
+  const unread=list.filter(c=>!c.read).length;
+
+  if(!isAdmin){
+    return`<div class="card">
+      <div class="card-title">📢 অভিযোগ / পরামর্শ পাঠান</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">আপনার অভিযোগ বা পরামর্শ অ্যানোনিমাসভাবে পাঠান। আপনার পরিচয় গোপন থাকবে।</p>
+      <textarea id="complaintInput" class="inp" rows="4" placeholder="এখানে আপনার অভিযোগ বা পরামর্শ লিখুন..." style="resize:vertical;min-height:100px">${esc(S.complaintText||'')}</textarea>
+      <button class="btn btn-dark" style="width:100%;justify-content:center" data-action="submitComplaint">পাঠান →</button>
+    </div>
+    <div class="card">
+      <p style="font-size:13px;color:var(--muted);text-align:center">🔒 আপনার পরিচয় সম্পূর্ণ গোপন থাকবে।<br>অ্যাডমিন শুধু বার্তাটি দেখতে পাবেন।</p>
+    </div>`;
+  }
+
+  // Admin view
+  return`<div class="card">
+    <div class="card-title">📢 অভিযোগ / পরামর্শ <span class="badge bg-red">${unread} নতুন</span></div>
+    ${list.length?list.map(c=>`
+      <div style="padding:14px;border-radius:10px;background:${c.read?'var(--cream)':'var(--blue-bg)'};border:1px solid ${c.read?'var(--border)':'rgba(42,95,158,.2)'};margin-bottom:10px">
+        <div style="font-size:14px;color:var(--text);line-height:1.6">${esc(c.text)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <span style="font-size:12px;color:var(--muted)">${esc(c.sentAt||'')} ${c.read?'<span class="badge bg-green">পড়া হয়েছে</span>':'<span class="badge bg-blue">নতুন</span>'}</span>
+          <div class="btn-grp">
+            ${!c.read?`<button class="btn btn-blue btn-sm" data-action="markRead:${c.id}">পড়া হয়েছে</button>`:''}
+            <button class="btn btn-ghost btn-sm" data-action="delComplaint:${c.id}">🗑️</button>
+          </div>
+        </div>
+      </div>`).join(''):`<div class="empty">কোনো অভিযোগ নেই</div>`}
+  </div>`;
 }
 
 // ── MODAL ──
